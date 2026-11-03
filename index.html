@@ -51,6 +51,8 @@ nav button span{display:block;font-size:20px}
 svg text{fill:var(--mute);font-size:10px}
 .hist-ex{font-size:13px;color:var(--mute);margin-top:4px}
 .pill{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--card2);color:var(--mute)}
+
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.editor{margin:10px 0;padding:12px;background:var(--card2);border-radius:10px}.editor label{display:block;margin:8px 0;font-size:13px}.editor input,.editor select{margin-top:4px}.muscle-row{display:grid;grid-template-columns:100px 1fr 54px;align-items:center;gap:10px;margin:10px 0;font-size:13px}.bar{height:8px;background:var(--card2);border-radius:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--acc)}.sp{min-width:0}h2{overflow-wrap:anywhere}.wrap{flex-wrap:wrap}.wrap input{flex:1;min-width:130px}button:focus-visible{outline:2px solid var(--acc)}
 </style>
 </head>
 <body>
@@ -100,6 +102,59 @@ const PROGRAM = {
 const ORDER = ["Lower", "Upper", "Full"];
 const LABEL = { Lower: "Lower", Upper: "Upper", Full: "Full Body" };
 
+
+const MUSCLES = ['Quads','Hamstrings','Glutes','Calves','Chest','Back','Shoulders','Biceps','Triceps','Core','Other'];
+function muscleOf(ex) {
+  if (MUSCLES.includes(ex.muscle)) return ex.muscle;
+  const n = ex.name.toLowerCase();
+  if (/calf|calves/.test(n)) return 'Calves';
+  if (/leg curl|rdl|romanian|hamstring/.test(n)) return 'Hamstrings';
+  if (/squat|leg press|leg extension/.test(n)) return 'Quads';
+  if (/glute|hip thrust/.test(n)) return 'Glutes';
+  if (/pulldown|pull.up|row/.test(n)) return 'Back';
+  if (/shoulder|lateral|overhead press/.test(n)) return 'Shoulders';
+  if (/chest|incline|bench|fly|push.up/.test(n)) return 'Chest';
+  if (/tricep|pushdown/.test(n)) return 'Triceps';
+  if (/bicep|curl/.test(n)) return 'Biceps';
+  if (/plank|crunch|abdominal|core/.test(n)) return 'Core';
+  return 'Other';
+}
+function muscleOptions(value) { return MUSCLES.map(m => '<option'+(m===value?' selected':'')+'>'+m+'</option>').join(''); }
+function muscleCounts(sessions) {
+  const counts = Object.fromEntries(MUSCLES.map(m => [m,0]));
+  sessions.forEach(s => s.exercises.forEach(ex => { if(ex.kind !== 'time') counts[muscleOf(ex)] += ex.sets.filter(s => s.done).length; }));
+  return counts;
+}
+function muscleTags(sessions) {
+  return '<div class="tags">'+Object.entries(muscleCounts(sessions)).filter(([,n]) => n).map(([m,n]) => '<span class="pill">'+m+': '+n+' sets</span>').join('')+'</div>';
+}
+let editing = -1, muscleRange = '7';
+function exerciseEditor(ex, ei) {
+  if(editing !== ei) return '';
+  return `<div class="editor"><h2>Edit / Swap exercise</h2><label>Exercise or equipment<input id="editName" list="exlist" value="${esc(ex.name)}"></label><label>Tracking<select id="editKind"><option value="wt" ${ex.kind==='wt'?'selected':''}>kg × reps</option><option value="bw" ${ex.kind==='bw'?'selected':''}>reps</option><option value="time" ${ex.kind==='time'?'selected':''}>minutes</option></select></label><label>Primary muscle<select id="editMuscle">${muscleOptions(muscleOf(ex))}</select></label><label>Form note<input id="editCue" value="${esc(ex.cue || '')}"></label><p class="mute">Changing the exercise keeps completed sets under the original name. Remaining sets move to the replacement; enter its own weight.</p><button class="pri sm" data-act="saveex" data-e="${ei}">Save changes</button> <button class="sm" data-act="canceledit">Cancel</button></div>`;
+}
+function saveExercise(ei, name, kind, muscle, cue) {
+  const ex = S.draft.exercises[ei];
+  const changed = ex.name !== name || ex.kind !== kind;
+  const completed = ex.sets.filter(s => s.done), remaining = ex.sets.filter(s => !s.done);
+  const replacement = {name,kind,muscle,cue,ss:'',sets:[]};
+  if (changed) {
+    const last = lastFor(name);
+    replacement.sets = (remaining.length ? remaining : [{r:10}]).map(s => ({w:last?last.w:0,r:last?last.r:(kind===ex.kind?s.r:10),done:false}));
+    if(completed.length) { ex.sets = completed; S.draft.exercises.splice(ei+1,0,replacement); }
+    else S.draft.exercises[ei] = replacement;
+    S.draft.exercises.forEach(e => {if(e.ss === ex.name || e.ss === ex.name.replace(/ \(.*\)/,'')) e.ss='';});
+  } else Object.assign(ex,{muscle,cue});
+  editing=-1; save(); render();
+}
+function muscleProgress() {
+  const end = todayStr(), cut = new Date(end+'T00:00:00');
+  cut.setDate(cut.getDate() - (Number(muscleRange)-1));
+  const start = cut.getFullYear()+'-'+pad(cut.getMonth()+1)+'-'+pad(cut.getDate());
+  const sessions = S.sessions.filter(s => s.date <= end && (muscleRange==='all' || s.date>=start));
+  const counts = muscleCounts(sessions), max = Math.max(1,...Object.values(counts));
+  return `<div class="card"><h2>Sets by muscle</h2><div class="seg">${[['7','7 days'],['30','30 days'],['all','All time']].map(([v,l])=>`<button class="${muscleRange===v?'on':''}" data-act="musclerange" data-range="${v}">${l}</button>`).join('')}</div><p class="mute">Completed sets, counted once under the primary muscle. Secondary muscles and timed exercises are excluded. You can edit the muscle assignment.</p>${Object.entries(counts).map(([m,n])=>`<div class="muscle-row"><span>${m}</span><span class="bar"><i style="width:${n/max*100}%"></i></span><b>${n} sets</b></div>`).join('')}<div class="mute">${sessions.length} saved workouts · ${Object.values(counts).reduce((a,b)=>a+b,0)} sets</div></div>`;
+}
 /* ---------- state ---------- */
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
@@ -132,7 +187,7 @@ function startSession(type) {
         sets: Array.from({ length: n }, (_, i) => ({ w: l ? l.w : (t.ws ? t.ws[i] : t.w), r: l ? l.r : t.r, done: false })) };
     })
   };
-  save(); render();
+  editing = -1; save(); render();
 }
 function exStats(ex) {
   const d = ex.sets.filter(s => s.done);
@@ -204,7 +259,8 @@ function viewToday() {
   const tot = d.exercises.reduce((a, e) => a + e.sets.length, 0);
   return `<div class="row"><h1 class="sp"><span class="badge">${LABEL[d.type] || d.type}</span>${fmtDate(d.date)}</h1><span class="pill">${done}/${tot} sets</span></div>
   ${d.exercises.map((ex, ei) => `<div class="card">
-    <div class="row"><h2 class="sp">${esc(ex.name)}</h2><button class="sm ghost danger" data-act="rmex" data-e="${ei}">✕</button></div>
+    <div class="row"><h2 class="sp">${esc(ex.name)}</h2><button class="sm" data-act="editex" data-e="${ei}">Edit / Swap</button><button class="sm ghost danger" data-act="rmex" data-e="${ei}">✕</button></div>
+    <div class="mute">Primary muscle: ${muscleOf(ex)}</div>${exerciseEditor(ex, ei)}
     ${ex.ss ? `<div class="mute" style="margin-bottom:4px">Superset with ${esc(ex.ss)}</div>` : ""}${ex.cue ? `<div class="cue">⚠ ${esc(ex.cue)}</div>` : ""}
     ${ex.sets.map((s, si) => `<div class="set"><span class="n">${si + 1}</span>
       ${ex.kind === "wt" ? `<input inputmode="decimal" data-f="w" data-e="${ei}" data-s="${si}" value="${s.w}"><span class="u">kg</span>` : ""}
@@ -213,9 +269,9 @@ function viewToday() {
     <div class="row" style="margin-top:8px"><button class="sm" data-act="addset" data-e="${ei}">+ Set</button>
       ${ex.sets.length > 1 ? `<button class="sm ghost" data-act="rmset" data-e="${ei}">− Set</button>` : ""}</div>
   </div>`).join("")}
-  <div class="card"><h2>Add exercise</h2><div class="row">
+  <div class="card"><h2>Add exercise</h2><div class="row wrap">
     <input id="newName" list="exlist" placeholder="Name (e.g. Tricep Extension)"><datalist id="exlist">${knownNames().map(n => `<option value="${esc(n)}">`).join("")}</datalist><select id="newKind" style="width:110px"><option value="wt">kg × reps</option><option value="bw">reps</option><option value="time">minutes</option></select>
-    <button data-act="addex">Add</button></div></div>
+    <label class="mute">Primary muscle<select id="newMuscle">${muscleOptions("Other")}</select></label><button data-act="addex">Add</button></div></div>
   <div class="card"><h2>Notes</h2><textarea id="note" rows="2" placeholder="How did it feel? Form notes…">${esc(d.note || "")}</textarea></div>
   <button class="pri" style="width:100%;margin-bottom:10px" data-act="finish">Finish &amp; Save</button>
   <button class="ghost danger" style="width:100%" data-act="discard">Discard session</button>`;
@@ -224,7 +280,8 @@ function viewHistory() {
   if (!S.sessions.length) return `<h1>History</h1><p class="mute">No sessions logged yet.</p>`;
   return `<h1>History</h1>` + S.sessions.slice().reverse().map(s => `<div class="card">
     <div class="row"><span class="badge">${LABEL[s.type] || s.type}</span><b class="sp">${fmtDate(s.date)}</b><button class="sm ghost danger" data-act="delsess" data-id="${s.id}">Delete</button></div>
-    ${s.exercises.map(summary).filter(Boolean).map(t => `<div class="hist-ex">${esc(t)}</div>`).join("")}
+    ${muscleTags([s])}
+    ${s.exercises.map((ex,ei) => `<div class="hist-ex">${esc(summary(ex))} · ${muscleOf(ex)} <button class="sm ghost" data-act="histmuscle" data-id="${esc(s.id)}" data-e="${ei}">Edit muscle</button></div>`).join("")}
     ${s.note ? `<div class="hist-ex" style="color:var(--tx);margin-top:8px">“${esc(s.note)}”</div>` : ""}</div>`).join("");
 }
 function viewProgress() {
@@ -251,6 +308,7 @@ function viewProgress() {
     avg = `<div class="mute">7-day avg: <b style="color:var(--acc)">${(w.reduce((a, b) => a + b.kg, 0) / w.length).toFixed(1)} kg</b> (${w.length} entries) · latest ${last.kg} kg</div>`;
   }
   return `<h1>Progress</h1>
+  ${muscleProgress()}
   <div class="card"><h2>Lifts</h2>${lifts}</div>
   <div class="card"><h2>Bodyweight</h2>
     <div class="row"><input id="bwDate" type="date" value="${todayStr()}" style="width:150px"><input id="bwKg" inputmode="decimal" placeholder="kg"><button class="pri" data-act="addbw">Add</button></div>
@@ -278,16 +336,32 @@ function render() {
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act, D = S.draft, ei = +b.dataset.e, si = +b.dataset.s;
+  if (a === "editex") { editing=ei; render(); return; }
+  if (a === "canceledit") { editing=-1; render(); return; }
+  if (a === "saveex") {
+    const name=document.getElementById('editName').value.trim();
+    if(!name) {alert('Enter an exercise name.');return;}
+    saveExercise(ei,name,document.getElementById('editKind').value,document.getElementById('editMuscle').value,document.getElementById('editCue').value.trim()); return;
+  }
+  if (a === "musclerange") {muscleRange=b.dataset.range; render();return;}
+  if (a === "histmuscle") {
+    const ex=S.sessions.find(s=>s.id===b.dataset.id).exercises[ei];
+    const value=prompt('Primary muscle for '+ex.name+'\n'+MUSCLES.join(', '),muscleOf(ex));
+    if(value===null)return;
+    const muscle=MUSCLES.find(m=>m.toLowerCase()===value.trim().toLowerCase());
+    if(!muscle){alert('Choose a muscle from the listed names.');return;}
+    ex.muscle=muscle;save();render();return;
+  }
   if (a === "tab") { tab = b.dataset.t; render(); window.scrollTo(0, 0); return; }
   if (a === "start") { startSession(b.dataset.t); return; }
   if (a === "tog") { const s = D.exercises[ei].sets[si]; s.done = !s.done; save(); render(); if (s.done && D.exercises[ei].kind !== "time") startRest(); return; }
   if (a === "addset") { const ex = D.exercises[ei], l = ex.sets[ex.sets.length - 1]; ex.sets.push({ w: l.w, r: l.r, done: false }); save(); render(); return; }
   if (a === "rmset") { D.exercises[ei].sets.pop(); save(); render(); return; }
-  if (a === "rmex") { if (confirm("Remove " + D.exercises[ei].name + " from this session?")) { D.exercises.splice(ei, 1); save(); render(); } return; }
+  if (a === "rmex") { if (confirm("Remove " + D.exercises[ei].name + " from this session?")) { D.exercises.splice(ei, 1); editing=-1; save(); render(); } return; }
   if (a === "addex") {
     const n = document.getElementById("newName").value.trim(); if (!n) return;
     const k = document.getElementById("newKind").value, l = lastFor(n);
-    D.exercises.push({ name: n, kind: k, cue: "", sets: Array.from({ length: 3 }, () => ({ w: l ? l.w : 0, r: l ? l.r : (k === "time" ? 10 : 10), done: false })) });
+    D.exercises.push({ name: n, kind: k, muscle: document.getElementById("newMuscle").value, cue: "", sets: Array.from({ length: 3 }, () => ({ w: l ? l.w : 0, r: l ? l.r : (k === "time" ? 10 : 10), done: false })) });
     save(); render(); return;
   }
   if (a === "finish") {
@@ -320,7 +394,11 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target;
-  if (t.id === "progEx") { progEx = t.value; render(); }
+  if (t.id === "newName" || t.id === "editName") {
+    const target=document.getElementById(t.id==='newName'?'newMuscle':'editMuscle');
+    target.value=muscleOf({name:t.value});
+  }
+  else if (t.id === "progEx") { progEx = t.value; render(); }
   else if (t.id === "restSel") { S.restSec = +t.value; save(); }
   else if (t.id === "file" && t.files[0]) {
     const fr = new FileReader();
