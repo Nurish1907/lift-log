@@ -72,14 +72,14 @@ const fmtDate = s => { const [y, m, d] = s.split("-").map(Number); return new Da
 /* ---------- program (Lower / Upper / Full rotation) ---------- */
 // kind: wt = kg x reps, bw = reps only (bodyweight / band), time = minutes
 const PROGRAM = {
-  Lower: [   // Monday
+  Lower: [
     { name: "Hack Squat", kind: "wt", sets: 4, w: 30, r: 9, cue: "" },
     { name: "Leg Curl", kind: "wt", sets: 4, w: 37.5, r: 10, ss: "Calf Raise", cue: "" },
     { name: "Seated Calf Raise", kind: "wt", sets: 4, w: 20, r: 10, ss: "Leg Curl", cue: "" },
     { name: "Leg Press", kind: "wt", sets: 3, w: 70, r: 10, cue: "" },
     { name: "Barbell RDL (plates, excl. bar)", kind: "wt", sets: 2, w: 20, r: 10, cue: "Neutral spine and neck. Stop where your hamstrings stop." }
   ],
-  Upper: [   // Tuesday
+  Upper: [
     { name: "Wide Lat Pulldown", kind: "wt", sets: 4, w: 37.5, r: 11, ss: "DB Incline Press", cue: "Depress your scapulae before you pull, no lumbar rounding." },
     { name: "DB Incline Press (per hand)", kind: "wt", sets: 4, w: 17.5, r: 10, ss: "Wide Lat Pulldown", cue: "" },
     { name: "DB Shoulder Press (per hand)", kind: "wt", sets: 3, w: 15, r: 8, cue: "" },
@@ -88,7 +88,7 @@ const PROGRAM = {
     { name: "Lateral Raise (per hand)", kind: "wt", sets: 3, w: 7.5, r: 10, cue: "" },
     { name: "Bicep Curl Machine", kind: "wt", sets: 2, w: 20, r: 10, cue: "" }
   ],
-  Full: [    // Thursday
+  Full: [
     { name: "Leg Extension", kind: "wt", ws: [40, 40, 47, 47], r: 11, cue: "" },
     { name: "Leg Curl", kind: "wt", sets: 4, w: 37.5, r: 11, cue: "" },
     { name: "Horizontal Row", kind: "wt", sets: 4, w: 42.5, r: 10, cue: "" },
@@ -195,14 +195,14 @@ function viewToday() {
     return `<h1>Lift Log</h1>
     <div class="card"><div class="mute">Next up</div>
       <h2 style="font-size:28px;margin:4px 0 8px"><span class="badge">${LABEL[n]}</span>${PROGRAM[n].map(e => esc(e.name.replace(/ \(.*\)/, ""))).slice(0, 3).join(", ")}…</h2>
-      <button class="pri" style="width:100%" data-act="start" data-t="${n}">Start ${LABEL[n]})</button></div>
+      <button class="pri" style="width:100%" data-act="start" data-t="${n}">Start ${LABEL[n]}</button></div>
     <div class="mute" style="margin:6px 2px">Or pick a different one:</div>
-    <div class="seg">${ORDER.map(t => `<button data-act="start" data-t="${t}">${t} <span class="mute">${DAYHINT[t]}</span></button>`).join("")}</div>
+    <div class="seg">${ORDER.map(t => `<button data-act="start" data-t="${t}">${LABEL[t]}</button>`).join("")}</div>
     ${S.sessions.length ? `<div class="mute">Last: ${LABEL[S.sessions[S.sessions.length - 1].type] || S.sessions[S.sessions.length - 1].type} on ${fmtDate(S.sessions[S.sessions.length - 1].date)}</div>` : ""}`;
   }
   const done = d.exercises.reduce((a, e) => a + e.sets.filter(s => s.done).length, 0);
   const tot = d.exercises.reduce((a, e) => a + e.sets.length, 0);
-  return `<div class="row"><h1 class="sp"><span class="badge">${LABEL[s.type] || s.type}</span>${fmtDate(d.date)}</h1><span class="pill">${done}/${tot} sets</span></div>
+  return `<div class="row"><h1 class="sp"><span class="badge">${LABEL[d.type] || d.type}</span>${fmtDate(d.date)}</h1><span class="pill">${done}/${tot} sets</span></div>
   ${d.exercises.map((ex, ei) => `<div class="card">
     <div class="row"><h2 class="sp">${esc(ex.name)}</h2><button class="sm ghost danger" data-act="rmex" data-e="${ei}">✕</button></div>
     ${ex.ss ? `<div class="mute" style="margin-bottom:4px">Superset with ${esc(ex.ss)}</div>` : ""}${ex.cue ? `<div class="cue">⚠ ${esc(ex.cue)}</div>` : ""}
@@ -223,7 +223,7 @@ function viewToday() {
 function viewHistory() {
   if (!S.sessions.length) return `<h1>History</h1><p class="mute">No sessions logged yet.</p>`;
   return `<h1>History</h1>` + S.sessions.slice().reverse().map(s => `<div class="card">
-    <div class="row"><span class="badge">${s.type}</span><b class="sp">${fmtDate(s.date)}</b><button class="sm ghost danger" data-act="delsess" data-id="${s.id}">Delete</button></div>
+    <div class="row"><span class="badge">${LABEL[s.type] || s.type}</span><b class="sp">${fmtDate(s.date)}</b><button class="sm ghost danger" data-act="delsess" data-id="${s.id}">Delete</button></div>
     ${s.exercises.map(summary).filter(Boolean).map(t => `<div class="hist-ex">${esc(t)}</div>`).join("")}
     ${s.note ? `<div class="hist-ex" style="color:var(--tx);margin-top:8px">“${esc(s.note)}”</div>` : ""}</div>`).join("");
 }
