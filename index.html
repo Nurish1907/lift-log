@@ -160,7 +160,7 @@ let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
 if (!S || typeof S !== "object") S = {};
 S.sessions = S.sessions || []; S.bw = S.bw || []; S.draft = S.draft || null; S.restSec = S.restSec || 90;
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { alert("Couldn't save: storage is full or blocked."); } };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); if (typeof scheduleSheetsBackup === "function") scheduleSheetsBackup(); } catch (e) { alert("Couldn't save: storage is full or blocked."); } };
 
 let tab = "today", progEx = "", progMetric = "top", rest = null;
 
@@ -418,5 +418,7 @@ window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); window
 render();
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
+<script src="sheets.js"></script>
 </body>
 </html>
+
